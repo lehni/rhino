@@ -105,7 +105,7 @@ public class NativeJavaClass extends NativeJavaObject implements Function
         if (name.equals("prototype"))
             return null;
 
-         if (staticFieldAndMethods != null) {
+        if (staticFieldAndMethods != null) {
             Object result = staticFieldAndMethods.get(name);
             if (result != null)
                 return result;
@@ -181,6 +181,12 @@ public class NativeJavaClass extends NativeJavaObject implements Function
         return construct(cx, scope, args);
     }
 
+    protected MemberBox findConstructor(Context cx, Object[] args)
+    {
+        int index = NativeJavaMethod.findFunction(cx, members.ctors, args);
+        return index >= 0 ? members.ctors[index] : null;
+    }
+
     public Scriptable construct(Context cx, Scriptable scope, Object[] args)
     {
         Class<?> classObject = getClassObject();
@@ -188,16 +194,15 @@ public class NativeJavaClass extends NativeJavaObject implements Function
         if (! (Modifier.isInterface(modifiers) ||
                Modifier.isAbstract(modifiers)))
         {
-            MemberBox[] ctors = members.ctors;
-            int index = NativeJavaMethod.findFunction(cx, ctors, args);
-            if (index < 0) {
+            MemberBox ctor = findConstructor(cx, args);
+            if (ctor == null) {
                 String sig = NativeJavaMethod.scriptSignature(args);
                 throw Context.reportRuntimeError2(
                     "msg.no.java.ctor", classObject.getName(), sig);
             }
 
             // Found the constructor, so try invoking it.
-            return constructSpecific(cx, scope, args, ctors[index]);
+            return constructSpecific(cx, scope, args, ctor);
         } else {
             Scriptable topLevel = ScriptableObject.getTopLevelScope(this);
             String msg = "";
