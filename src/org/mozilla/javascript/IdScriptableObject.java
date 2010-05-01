@@ -719,75 +719,73 @@ public abstract class IdScriptableObject extends ScriptableObject
     }
 
     @Override
-    public void defineOwnProperty(Context cx, Object key, ScriptableObject desc) {
-      if (key instanceof String) {
-        String name = (String) key;
+    public void defineOwnProperty(Context cx, Object key,
+            PropertyDescriptor desc) {
+        if (key instanceof String) {
+            String name = (String) key;
+            int info = findInstanceIdInfo(name);
+            if (info != 0) {
+                int id = (info & 0xFFFF);
+                if (desc.isAccessorDescriptor()) {
+                    delete(id); // it will be replaced with a slot
+                } else {
+                    int attr = (info >>> 16);
+                    Object value = desc.getValue();
+                    setInstanceIdValue(id,
+                            value == NOT_FOUND ? Undefined.instance : value);
+                    setAttributes(id, desc.applyToAttributes(attr));
+                    return;
+                }
+            }
+            if (prototypeValues != null) {
+                int id = prototypeValues.findId(name);
+                if (id != 0) {
+                    if (desc.isAccessorDescriptor()) {
+                        prototypeValues.delete(id); // it will be replaced with
+                        // a slot
+                    } else {
+                        int attr = prototypeValues.getAttributes(id);
+                        Object value = desc.getValue();
+                        prototypeValues
+                                .set(id, this,
+                                        value == NOT_FOUND ? Undefined.instance
+                                                : value);
+                        prototypeValues.setAttributes(id, desc
+                                .applyToAttributes(attr));
+                        return;
+                    }
+                }
+            }
+        }
+        super.defineOwnProperty(cx, key, desc);
+    }
+
+    @Override
+    protected PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
+        PropertyDescriptor desc = super.getOwnPropertyDescriptor(cx, id);
+        if (desc == null && id instanceof String) {
+            desc = getBuiltInDescriptor((String) id);
+        }
+        return desc;
+    }
+
+    private PropertyDescriptor getBuiltInDescriptor(String name) {
         int info = findInstanceIdInfo(name);
         if (info != 0) {
             int id = (info & 0xFFFF);
-            if (isAccessorDescriptor(desc)) {
-              delete(id); // it will be replaced with a slot
-            } else {
-              int attr = (info >>> 16);
-              Object value = getProperty(desc, "value");
-              setInstanceIdValue(id, value == NOT_FOUND ? Undefined.instance : value);
-              setAttributes(id, applyDescriptorToAttributeBitset(attr, desc));
-              return;
-            }
+            Object value = getInstanceIdValue(id);
+            int attr = (info >>> 16);
+            return new PropertyDescriptor(value, attr);
         }
         if (prototypeValues != null) {
             int id = prototypeValues.findId(name);
             if (id != 0) {
-              if (isAccessorDescriptor(desc)) {
-                prototypeValues.delete(id); // it will be replaced with a slot
-              } else {
+                Object value = prototypeValues.get(id);
                 int attr = prototypeValues.getAttributes(id);
-                Object value = getProperty(desc, "value");
-                prototypeValues.set(id, this, value == NOT_FOUND ? Undefined.instance : value);
-                prototypeValues.setAttributes(id, applyDescriptorToAttributeBitset(attr, desc));
-                return;
-              }
+                return new PropertyDescriptor(value, attr);
             }
         }
-      }
-      super.defineOwnProperty(cx, key, desc);
-    }
-
-
-    @Override
-    protected ScriptableObject getOwnPropertyDescriptor(Context cx, Object id) {
-      ScriptableObject desc = super.getOwnPropertyDescriptor(cx, id);
-      if (desc == null && id instanceof String) {
-        desc = getBuiltInDescriptor((String) id);
-      }
-      return desc;
-    }
-
-    private ScriptableObject getBuiltInDescriptor(String name) {
-      Object value = null;
-      int attr = EMPTY;
-
-      Scriptable scope = getParentScope();
-      if (scope == null) {
-        scope = this;
-      }
-
-      int info = findInstanceIdInfo(name);
-      if (info != 0) {
-        int id = (info & 0xFFFF);
-        value = getInstanceIdValue(id);
-        attr = (info >>> 16);
-        return buildDataDescriptor(scope, value, attr);
-      } 
-      if (prototypeValues != null) {
-        int id = prototypeValues.findId(name);
-        if (id != 0) {
-          value = prototypeValues.get(id);
-          attr = prototypeValues.getAttributes(id);
-          return buildDataDescriptor(scope, value, attr);
-        }
-      }
-      return null;
+        return null;
     }
 
     private void readObject(ObjectInputStream stream)
