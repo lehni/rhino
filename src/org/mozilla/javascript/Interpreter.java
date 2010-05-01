@@ -1078,65 +1078,6 @@ switch (op) {
         throwable = stack[indexReg];
         break withoutExceptions;
     }
-    case Token.GE :
-    case Token.LE :
-    case Token.GT :
-    case Token.LT : {
-        --stackTop;
-        Object rhs = stack[stackTop + 1];
-        Object lhs = stack[stackTop];
-        boolean valBln;
-      object_compare:
-        {
-          number_compare:
-            {
-                double rDbl, lDbl;
-                if (rhs == DBL_MRK) {
-                    rDbl = sDbl[stackTop + 1];
-                    lDbl = stack_double(frame, stackTop);
-                } else if (lhs == DBL_MRK) {
-                    rDbl = ScriptRuntime.toNumber(rhs);
-                    lDbl = sDbl[stackTop];
-                } else {
-                    break number_compare;
-                }
-                switch (op) {
-                  case Token.GE:
-                    valBln = (lDbl >= rDbl);
-                    break object_compare;
-                  case Token.LE:
-                    valBln = (lDbl <= rDbl);
-                    break object_compare;
-                  case Token.GT:
-                    valBln = (lDbl > rDbl);
-                    break object_compare;
-                  case Token.LT:
-                    valBln = (lDbl < rDbl);
-                    break object_compare;
-                  default:
-                    throw Kit.codeBug();
-                }
-            }
-            switch (op) {
-              case Token.GE:
-                valBln = ScriptRuntime.cmp_LE(rhs, lhs);
-                break;
-              case Token.LE:
-                valBln = ScriptRuntime.cmp_LE(lhs, rhs);
-                break;
-              case Token.GT:
-                valBln = ScriptRuntime.cmp_LT(rhs, lhs);
-                break;
-              case Token.LT:
-                valBln = ScriptRuntime.cmp_LT(lhs, rhs);
-                break;
-              default:
-                throw Kit.codeBug();
-            }
-        }
-        stack[stackTop] = ScriptRuntime.wrapBoolean(valBln);
-        continue Loop;
-    }
     case Token.IN :
     case Token.INSTANCEOF : {
         Object rhs = stack[stackTop];
@@ -1150,37 +1091,6 @@ switch (op) {
         } else {
             valBln = ScriptRuntime.instanceOf(lhs, rhs, cx);
         }
-        stack[stackTop] = ScriptRuntime.wrapBoolean(valBln);
-        continue Loop;
-    }
-    case Token.EQ :
-    case Token.NE : {
-        --stackTop;
-        boolean valBln;
-        Object rhs = stack[stackTop + 1];
-        Object lhs = stack[stackTop];
-        if (rhs == DBL_MRK) {
-            if (lhs == DBL_MRK) {
-                valBln = (sDbl[stackTop] == sDbl[stackTop + 1]);
-            } else {
-                valBln = ScriptRuntime.eqNumber(sDbl[stackTop + 1], lhs);
-            }
-        } else {
-            if (lhs == DBL_MRK) {
-                valBln = ScriptRuntime.eqNumber(sDbl[stackTop], rhs);
-            } else {
-                valBln = ScriptRuntime.eq(lhs, rhs);
-            }
-        }
-        valBln ^= (op == Token.NE);
-        stack[stackTop] = ScriptRuntime.wrapBoolean(valBln);
-        continue Loop;
-    }
-    case Token.SHEQ :
-    case Token.SHNE : {
-        --stackTop;
-        boolean valBln = shallowEquals(stack, sDbl, stackTop);
-        valBln ^= (op == Token.SHNE);
         stack[stackTop] = ScriptRuntime.wrapBoolean(valBln);
         continue Loop;
     }
@@ -1324,45 +1234,26 @@ switch (op) {
         sDbl[stackTop] = ScriptRuntime.toUint32(lDbl) >>> rIntValue;
         continue Loop;
     }
-    case Token.NEG :
-    case Token.POS : {
-        double rDbl = stack_double(frame, stackTop);
-        stack[stackTop] = DBL_MRK;
-        if (op == Token.NEG) {
-            rDbl = -rDbl;
-        }
-        sDbl[stackTop] = rDbl;
-        continue Loop;
-    }
+    case Token.EQ :
+    case Token.NE :
+    case Token.SHEQ :
+    case Token.SHNE :
+    case Token.GE :
+    case Token.LE :
+    case Token.GT :
+    case Token.LT :
     case Token.ADD :
-        --stackTop;
-        do_add(stack, sDbl, stackTop, cx);
-        continue Loop;
     case Token.SUB :
     case Token.MUL :
     case Token.DIV :
-    case Token.MOD : {
-        double rDbl = stack_double(frame, stackTop);
+    case Token.MOD :
         --stackTop;
-        double lDbl = stack_double(frame, stackTop);
-        stack[stackTop] = DBL_MRK;
-        switch (op) {
-          case Token.SUB:
-            lDbl -= rDbl;
-            break;
-          case Token.MUL:
-            lDbl *= rDbl;
-            break;
-          case Token.DIV:
-            lDbl /= rDbl;
-            break;
-          case Token.MOD:
-            lDbl %= rDbl;
-            break;
-        }
-        sDbl[stackTop] = lDbl;
+        do_operator(op, stack, sDbl, stackTop, cx, frame.scope);
         continue Loop;
-    }
+    case Token.NEG :
+    case Token.POS :
+        do_sign_operator(op, stack, sDbl, stackTop, cx, frame.scope);
+        continue Loop;
     case Token.NOT :
         stack[stackTop] = ScriptRuntime.wrapBoolean(
                               !stack_boolean(frame, stackTop));
@@ -3024,71 +2915,201 @@ switch (op) {
         }
     }
 
-    private static void do_add(Object[] stack, double[] sDbl, int stackTop,
-                              Context cx)
-    {
+    private static void do_operator(int operator, Object[] stack, double[] sDbl,
+            int stackTop, Context cx, Scriptable scope) {
         Object rhs = stack[stackTop + 1];
         Object lhs = stack[stackTop];
-        double d;
-        boolean leftRightOrder;
-        if (rhs == UniqueTag.DOUBLE_MARK) {
-            d = sDbl[stackTop + 1];
-            if (lhs == UniqueTag.DOUBLE_MARK) {
-                sDbl[stackTop] += d;
-                return;
-            }
-            leftRightOrder = true;
-            // fallthrough to object + number code
-        } else if (lhs == UniqueTag.DOUBLE_MARK) {
-            d = sDbl[stackTop];
-            lhs = rhs;
-            leftRightOrder = false;
-            // fallthrough to object + number code
+        boolean lhsIsDouble, rhsIsDouble;
+        double lhsDouble, rhsDouble;
+        Number lhsNumber, rhsNumber;
+        if (lhs == UniqueTag.DOUBLE_MARK) {
+            lhsIsDouble = true;
+            lhsNumber = null;
+            lhsDouble = sDbl[stackTop];
+        } else if (lhs instanceof Number) {
+            lhsIsDouble = true;
+            lhsNumber = (Number) lhs;
+            lhsDouble = 0; // prevent compilation error
         } else {
-            if (lhs instanceof Scriptable || rhs instanceof Scriptable) {
-                stack[stackTop] = ScriptRuntime.add(lhs, rhs, cx);
-            } else if (lhs instanceof String) {
-                String lstr = (String)lhs;
-                String rstr = ScriptRuntime.toString(rhs);
-                stack[stackTop] = lstr.concat(rstr);
-            } else if (rhs instanceof String) {
-                String lstr = ScriptRuntime.toString(lhs);
-                String rstr = (String)rhs;
-                stack[stackTop] = lstr.concat(rstr);
-            } else {
-                double lDbl = (lhs instanceof Number)
-                    ? ((Number)lhs).doubleValue() : ScriptRuntime.toNumber(lhs);
-                double rDbl = (rhs instanceof Number)
-                    ? ((Number)rhs).doubleValue() : ScriptRuntime.toNumber(rhs);
-                stack[stackTop] = UniqueTag.DOUBLE_MARK;
-                sDbl[stackTop] = lDbl + rDbl;
+            lhsIsDouble = false;
+            lhsNumber = null;
+            lhsDouble = 0; // prevent compilation error
+        }
+        if (rhs == UniqueTag.DOUBLE_MARK) {
+            rhsIsDouble = true;
+            rhsNumber = null;
+            rhsDouble = sDbl[stackTop + 1];
+        } else if (rhs instanceof Number) {
+            rhsIsDouble = true;
+            rhsNumber = (Number) rhs;
+            rhsDouble = 0; // prevent compilation error
+        } else {
+            rhsIsDouble = false;
+            rhsNumber = null;
+            rhsDouble = 0; // prevent compilation error
+        }
+        if (lhsIsDouble && rhsIsDouble) {
+            if (lhsNumber != null)
+                lhsDouble = lhsNumber.doubleValue();
+            if (rhsNumber != null)
+                rhsDouble = rhsNumber.doubleValue();
+            switch (operator) {
+                case Token.ADD:
+                    stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                    sDbl[stackTop] = lhsDouble + rhsDouble;
+                    break;
+                case Token.SUB:
+                    stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                    sDbl[stackTop] = lhsDouble - rhsDouble;
+                    break;
+                case Token.MUL:
+                    stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                    sDbl[stackTop] = lhsDouble * rhsDouble;
+                    break;
+                case Token.DIV:
+                    stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                    sDbl[stackTop] = lhsDouble / rhsDouble;
+                    break;
+                case Token.MOD:
+                    stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                    sDbl[stackTop] = lhsDouble % rhsDouble;
+                    break;
+                case Token.EQ:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(ScriptRuntime.eqNumber(lhsDouble, rhsDouble));
+                    break;
+                case Token.NE:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(!ScriptRuntime.eqNumber(lhsDouble, rhsDouble));
+                    break;
+                case Token.SHEQ:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(lhsDouble == rhsDouble);
+                    break;
+                case Token.SHNE:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(lhsDouble != rhsDouble);
+                    break;
+                case Token.GE:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(lhsDouble >= rhsDouble);
+                    break;
+                case Token.LE:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(lhsDouble <= rhsDouble);
+                    break;
+                case Token.GT:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(lhsDouble > rhsDouble);
+                    break;
+                case Token.LT:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(lhsDouble < rhsDouble);
+                    break;
+                default:
+                    throw Kit.codeBug();
             }
             return;
-        }
-
-        // handle object(lhs) + number(d) code
-        if (lhs instanceof Scriptable) {
-            rhs = ScriptRuntime.wrapNumber(d);
-            if (!leftRightOrder) {
-                Object tmp = lhs;
-                lhs = rhs;
-                rhs = tmp;
-            }
-            stack[stackTop] = ScriptRuntime.add(lhs, rhs, cx);
-        } else if (lhs instanceof String) {
-            String lstr = (String)lhs;
-            String rstr = ScriptRuntime.toString(d);
-            if (leftRightOrder) {
-                stack[stackTop] = lstr.concat(rstr);
-            } else {
-                stack[stackTop] = rstr.concat(lstr);
-            }
         } else {
-            double lDbl = (lhs instanceof Number)
-                ? ((Number)lhs).doubleValue() : ScriptRuntime.toNumber(lhs);
-            stack[stackTop] = UniqueTag.DOUBLE_MARK;
-            sDbl[stackTop] = lDbl + d;
+            if (lhsIsDouble && lhsNumber == null)
+                lhs = ScriptRuntime.wrapNumber(lhsDouble);
+            if (rhsIsDouble && rhsNumber == null)
+                rhs = ScriptRuntime.wrapNumber(rhsDouble);
         }
+        // Try handler now, if set:
+        OperatorHandler handler = cx.getOperatorHandler();
+        Object result = handler != null
+            ? handler.handleOperator(cx, scope, operator, lhs, rhs)
+            : null;
+        if (result == null) { // default handling:
+            switch (operator) {
+                case Token.ADD:
+                    result = ScriptRuntime.add(lhs, rhs, cx);
+                    break;
+                case Token.SUB :
+                case Token.MUL :
+                case Token.DIV :
+                case Token.MOD: {
+                    lhsDouble = ScriptRuntime.toNumber(lhs);
+                    rhsDouble = ScriptRuntime.toNumber(rhs);
+                    switch (operator) {
+                        case Token.SUB:
+                            lhsDouble -= rhsDouble;
+                            break;
+                        case Token.MUL:
+                            lhsDouble *= rhsDouble;
+                            break;
+                        case Token.DIV:
+                            lhsDouble /= rhsDouble;
+                            break;
+                        case Token.MOD:
+                            lhsDouble %= rhsDouble;
+                            break;
+                    }
+                    stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                    sDbl[stackTop] = lhsDouble;
+                    break;
+                }
+                case Token.EQ:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(ScriptRuntime.eq(lhs, rhs));
+                    break;
+                case Token.NE:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(!ScriptRuntime.eq(lhs, rhs));
+                    break;
+                case Token.SHEQ:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(ScriptRuntime.shallowEq(lhs, rhs));
+                    break;
+                case Token.SHNE:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(!ScriptRuntime.shallowEq(lhs, rhs));
+                    break;
+                case Token.GE:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(ScriptRuntime.cmp_LE(rhs, lhs));
+                    break;
+                case Token.LE:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(ScriptRuntime.cmp_LE(lhs, rhs));
+                    break;
+                case Token.GT:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(ScriptRuntime.cmp_LT(rhs, lhs));
+                    break;
+                case Token.LT:
+                    stack[stackTop] = ScriptRuntime.wrapBoolean(ScriptRuntime.cmp_LT(lhs, rhs));
+                    break;
+                default:
+                    // Unsupported arithmetics -> NaN
+                    stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                    sDbl[stackTop] = Double.NaN;
+            }
+        }
+        if (result != null) {
+            if (result instanceof Double) {
+                stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                sDbl[stackTop] = ((Double) result).doubleValue();
+            } else {
+                stack[stackTop] = result;
+            }
+        }
+    }
+
+    private static void do_sign_operator(int operator, Object[] stack, double[] sDbl,
+            int stackTop, Context cx, Scriptable scope) {
+        Object rhs = stack[stackTop];
+        double rDbl;
+        if (rhs == UniqueTag.DOUBLE_MARK) {
+            rDbl = sDbl[stackTop];
+        } else {
+            OperatorHandler handler;
+            if (rhs instanceof Number || (handler = cx.getOperatorHandler()) == null) {
+                rDbl = ScriptRuntime.toNumber(rhs); 
+            } else {
+                Object result = handler.handleSignOperator(cx, scope, operator, rhs);
+                if (result == null) {
+                    rDbl = ScriptRuntime.toNumber(rhs); 
+                } else {
+                    if (result instanceof Double) {
+                        stack[stackTop] = UniqueTag.DOUBLE_MARK;
+                        sDbl[stackTop] = ((Double) result).doubleValue();
+                    } else {
+                        stack[stackTop] = result;
+                    }
+                    return;
+                }
+            }
+        }
+        // If we're still here, perform  double sign operator
+        stack[stackTop] = UniqueTag.DOUBLE_MARK;
+        sDbl[stackTop] = operator == Token.NEG ? -rDbl : rDbl;
     }
 
     private static Object[] getArgsArray(Object[] stack, double[] sDbl,
