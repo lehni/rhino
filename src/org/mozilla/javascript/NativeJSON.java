@@ -54,7 +54,7 @@ import java.util.LinkedList;
  * See ECMA 15.12.
  * @author Matthew Crumley, Raphael Speyer
  */
-final class NativeJSON extends IdScriptableObject
+public final class NativeJSON extends IdScriptableObject
 {
     static final long serialVersionUID = -4567599697595654984L;
 
@@ -139,7 +139,7 @@ final class NativeJSON extends IdScriptableObject
         }
     }
 
-    private static Object parse(Context cx, Scriptable scope, String jtext) {
+    public static Object parse(Context cx, Scriptable scope, String jtext) {
       try {
         return new JsonParser(cx, scope).parseValue(jtext);
       } catch (JsonParser.ParseException ex) {
