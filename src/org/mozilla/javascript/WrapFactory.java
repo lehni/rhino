@@ -102,7 +102,7 @@ public class WrapFactory
         if (cls.isArray()) {
             return NativeJavaArray.wrap(scope, obj);
         }
-        return wrapAsJavaObject(cx, scope, obj, staticType);
+        return wrapAsJavaObject(cx, scope, obj, staticType, false);
     }
 
     /**
@@ -121,7 +121,7 @@ public class WrapFactory
         if (cls.isArray()) {
             return NativeJavaArray.wrap(scope, obj);
         }
-        return wrapAsJavaObject(cx, scope, obj, null);
+        return wrapAsJavaObject(cx, scope, obj, null, true);
     }
 
     /**
@@ -143,7 +143,7 @@ public class WrapFactory
      * @return the wrapped value which shall not be null
      */
     public Scriptable wrapAsJavaObject(Context cx, Scriptable scope,
-                                       Object javaObject, Class<?> staticType)
+                                       Object javaObject, Class<?> staticType, boolean newObject)
     {
         Scriptable wrap;
         wrap = new NativeJavaObject(scope, javaObject, staticType);
