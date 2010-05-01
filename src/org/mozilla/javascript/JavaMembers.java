@@ -99,8 +99,7 @@ class JavaMembers
             member = staticMembers.get(name);
         }
         if (member == null) {
-            member = this.getExplicitFunction(scope, name,
-                                              javaObject, isStatic);
+            member = this.getExplicitFunction(scope, name, isStatic);
             if (member == null)
                 return Scriptable.NOT_FOUND;
         }
@@ -285,8 +284,7 @@ class JavaMembers
         return null;
     }
 
-    private Object getExplicitFunction(Scriptable scope, String name,
-                                       Object javaObject, boolean isStatic)
+    private Object getExplicitFunction(Scriptable scope, String name, boolean isStatic)
     {
         Map<String,Object> ht = isStatic ? staticMembers : members;
         Object member = null;
@@ -646,10 +644,13 @@ class JavaMembers
                             }
                         }
                     }
-                    // Make the property.
-                    BeanProperty bp = new BeanProperty(getter, setter,
-                                                       setters);
-                    toAdd.put(beanPropertyName, bp);
+                    // Make sure we actually found a getter / setter
+                    if (getter != null || setter != null) {
+                    	// Make the property.
+                        BeanProperty bp = new BeanProperty(getter, setter,
+                                setters);
+                            toAdd.put(beanPropertyName, bp);
+                    }
                 }
             }
 
