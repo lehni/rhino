@@ -102,7 +102,7 @@ public class WrapFactory
         if (cls.isArray()) {
             return NativeJavaArray.wrap(scope, obj);
         }
-        return wrapAsJavaObject(cx, scope, obj, staticType);
+        return wrapAsJavaObject(cx, scope, obj, staticType, false);
     }
 
     /**
@@ -121,7 +121,7 @@ public class WrapFactory
         if (cls.isArray()) {
             return NativeJavaArray.wrap(scope, obj);
         }
-        return wrapAsJavaObject(cx, scope, obj, null);
+        return wrapAsJavaObject(cx, scope, obj, null, true);
     }
 
     /**
@@ -143,7 +143,7 @@ public class WrapFactory
      * @return the wrapped value which shall not be null
      */
     public Scriptable wrapAsJavaObject(Context cx, Scriptable scope,
-                                       Object javaObject, Class<?> staticType)
+                                       Object javaObject, Class<?> staticType, boolean newObject)
     {
         Scriptable wrap;
         wrap = new NativeJavaObject(scope, javaObject, staticType);
@@ -158,6 +158,23 @@ public class WrapFactory
     public boolean shouldRemoveGetterSetter(Class<?> cls, boolean isStatic,
             MemberBox getter, MemberBox setter) {
         return false;
+    }
+    
+    /**
+     * Same as NativeJavaObject CONVERSION_*, but to be used
+     * by WrapFactory#getConversionWeight
+     */
+    public static final byte CONVERSION_TRIVIAL      = 1;
+    public static final byte CONVERSION_NONTRIVIAL   = 0;
+    public static final byte CONVERSION_NONE         = 99;
+
+	public int getConversionWeight(Object from, Object unwrapped, Class<?> to,
+	        int defaultWeight) {
+        return defaultWeight;
+	}
+
+    public Object coerceType(Class<?> type, Object value, Object unwrapped) {
+    	return null;
     }
     
     /**
