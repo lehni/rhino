@@ -761,7 +761,7 @@ public abstract class IdScriptableObject extends ScriptableObject
     }
 
     @Override
-    protected PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
+    public PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
         PropertyDescriptor desc = super.getOwnPropertyDescriptor(cx, id);
         if (desc == null && id instanceof String) {
             desc = getBuiltInDescriptor((String) id);

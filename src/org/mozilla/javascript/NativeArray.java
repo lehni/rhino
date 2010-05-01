@@ -523,7 +523,7 @@ public class NativeArray extends IdScriptableObject
     }
 
     @Override
-    protected PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
+    public PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
         if (dense != null) {
             int index = toIndex(id);
             if (0 <= index && index < length) {
