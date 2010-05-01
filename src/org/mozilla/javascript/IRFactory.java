@@ -1950,7 +1950,7 @@ public final class IRFactory extends Parser
             } else if (right.type == Token.NUMBER) {
                 if (right.getDouble() == 1.0) {
                     //second 1: x * 1 -> +x
-                    // can not make simply x because x - 0 must be number
+                    // not simply x to force number conversion
                     return new Node(Token.POS, left);
                 }
             }
@@ -1967,7 +1967,7 @@ public final class IRFactory extends Parser
                     return left;
                } else if (rd == 1.0) {
                     // second 1: x/1 -> +x
-                    // not simply x to force number convertion
+                    // not simply x to force number conversion
                     return new Node(Token.POS, left);
                 }
             }
