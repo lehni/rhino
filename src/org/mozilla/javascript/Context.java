@@ -2111,6 +2111,19 @@ public class Context
         return wrapFactory;
     }
 
+    public final void setOperatorHandler(OperatorHandler operatorHandler)
+    {
+        if (sealed) onSealedMutation();
+        if (operatorHandler == null)
+            throw new IllegalArgumentException();
+        this.operatorHandler = operatorHandler;
+    }
+
+    public final OperatorHandler getOperatorHandler()
+    {
+        return operatorHandler;
+    }
+
     /**
      * Return the current debugger.
      * @return the debugger, or null if none is attached.
@@ -2635,6 +2648,7 @@ public class Context
     private int optimizationLevel;
     private int maximumInterpreterStackDepth;
     private WrapFactory wrapFactory;
+    private OperatorHandler operatorHandler;
     Debugger debugger;
     private Object debuggerData;
     private int enterCount;
