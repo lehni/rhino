@@ -487,18 +487,18 @@ class JavaMembers
                     methodBoxes[0] = new MemberBox((Method)value);
                 } else {
                     ObjArray overloadedMethods = (ObjArray)value;
-					// Filter out synthetic bridge methods, generated for
-					// generics (see ClassFileFormat-Java5.pdf).
-					// These methods may pretend to take Objects but then cast
-					// to the type defined by erasures, leading to Rhino
-					// preferring the wrong versions and then throwing a
-					// ClassCastException.
-					// Do not filter in discoverAccessibleMethods since it is
-					// easier to discover synthetic-only methods that should
-					// still be added, since methods are grouped by name here.
-					// This happens for example in various classes of the Java
-					// 1.6 Doclet API, but not in 1.5. No idea where these
-					// modifiers come from there.
+                    // Filter out synthetic bridge methods, generated for
+                    // generics (see ClassFileFormat-Java5.pdf).
+                    // These methods may pretend to take Objects but then cast
+                    // to the type defined by erasures, leading to Rhino
+                    // preferring the wrong versions and then throwing a
+                    // ClassCastException.
+                    // Do not filter in discoverAccessibleMethods since it is
+                    // easier to discover synthetic-only methods that should
+                    // still be added, since methods are grouped by name here.
+                    // This happens for example in various classes of the Java
+                    // 1.6 Doclet API, but not in 1.5. No idea where these
+                    // modifiers come from there.
                     int count = overloadedMethods.size();
                     if (count < 2) Kit.codeBug();
                     ObjArray validMethods = new ObjArray();
@@ -506,8 +506,8 @@ class JavaMembers
                         Method method = (Method) overloadedMethods.get(i);
                         if (method.isBridge() && method.isSynthetic()) {
                             // See if there is another method with a similar
-                        	// signature. If there is, do not add this one,
-                        	// otherwise keep it
+                            // signature. If there is, do not add this one,
+                            // otherwise keep it
                             boolean overrides = false;
                             Class<?> returnType = method.getReturnType();
                             Class<?>[] types = method.getParameterTypes();
