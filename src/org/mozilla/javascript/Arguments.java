@@ -339,7 +339,7 @@ final class Arguments extends IdScriptableObject
     }
 
     @Override
-    protected PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
+    public PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
         double d = ScriptRuntime.toNumber(id);
         int index = (int) d;
         if (d != index) {

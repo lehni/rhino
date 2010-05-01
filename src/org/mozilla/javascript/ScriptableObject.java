@@ -2864,22 +2864,21 @@ public abstract class ScriptableObject implements Scriptable, Serializable,
         }
     }
 
-    protected PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
-      Slot slot = getSlot(cx, id, SLOT_QUERY);
-      if (slot == null) return null;
-      return slot.getPropertyDescriptor();
+    public PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
+        Slot slot = getSlot(cx, id, SLOT_QUERY);
+        if (slot == null)
+            return null;
+        return slot.getPropertyDescriptor();
     }
 
     protected Slot getSlot(Context cx, Object id, int accessType) {
-      final Slot slot;
-      String name = ScriptRuntime.toStringIdOrIndex(cx, id);
-      if (name == null) {
-        int index = ScriptRuntime.lastIndexResult(cx);
-        slot = getSlot(null, index, accessType);
-      } else {
-        slot = getSlot(name, 0, accessType);
-      }
-      return slot;
+        String name = ScriptRuntime.toStringIdOrIndex(cx, id);
+        if (name == null) {
+            int index = ScriptRuntime.lastIndexResult(cx);
+            return getSlot(null, index, accessType);
+        } else {
+            return getSlot(name, 0, accessType);
+        }
     }
 
     // Methods and classes to implement java.util.Map interface
