@@ -559,6 +559,9 @@ class JavaMembers
             }
         }
 
+        Context cx = Context.getContext();
+        WrapFactory wrapFactory = cx.getWrapFactory();
+
         // Create bean properties from corresponding get/set methods first for
         // static members and then for instance members
         for (int tableCursor = 0; tableCursor != 2; ++tableCursor) {
@@ -566,6 +569,7 @@ class JavaMembers
             Map<String,Object> ht = isStatic ? staticMembers : members;
 
             Map<String,BeanProperty> toAdd = new HashMap<String,BeanProperty>();
+            ArrayList<BeanProperty> toRemove = new ArrayList<BeanProperty>();
 
             // Now, For each member, make "bean" properties.
             for (String name: ht.keySet()) {
@@ -646,10 +650,35 @@ class JavaMembers
                             }
                         }
                     }
-                    // Make the property.
-                    BeanProperty bp = new BeanProperty(getter, setter,
-                                                       setters);
-                    toAdd.put(beanPropertyName, bp);
+                    // Make sure we actually found a getter / setter
+                    if (getter != null || setter != null) {
+                        // Allow the wrapFactor to control when to produce beans
+                        // for methods.
+                        if (wrapFactory.shouldAddBean(cl, isStatic, getter,
+                                setter)) {
+                            // Make the property.
+                            BeanProperty bp = new BeanProperty(getter, setter,
+                                    setters);
+                            toAdd.put(beanPropertyName, bp);
+                            // Allow the wrapFactor to control when to remove
+                            // getter / setter methods
+                            if (wrapFactory.shouldRemoveGetterSetter(cl,
+                                    isStatic, getter, setter)) {
+                                toRemove.add(bp);
+                                // If this bean property has a reference to the
+                                // setters method we need to clone it since we're
+                                // going to remove fields from the main function
+                                // in ht.
+                                if (bp.setters != null) {
+                                    bp.setters = new NativeJavaMethod(
+                                            bp.setters.methods);
+                                    if (scope != null)
+                                        ScriptRuntime.setFunctionProtoAndParent(
+                                                bp.setters, scope);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -658,6 +687,27 @@ class JavaMembers
                 Object value = toAdd.get(key);
                 ht.put(key, value);
             }
+
+            // Remove the marked getters / setters
+            for (BeanProperty bp : toRemove) {
+                if (bp.getter != null)
+                    removeMethod(ht, bp.getter);
+                if (bp.setters == null) {
+                    if (bp.setter != null)
+                        removeMethod(ht, bp.setter);
+                } else {
+                    // Scan through setters and find the ones
+                    // that are really used
+                    // as setters, remove only these.
+                    ArrayList<MemberBox> removeSetters = new ArrayList<MemberBox>();
+                    for (MemberBox member : bp.setters.methods) {
+                        if (member.method().getReturnType() == Void.TYPE
+                            && member.argTypes.length == 1)
+                            removeSetters.add(member);
+                    }
+                    removeMethods(ht, removeSetters);
+                }
+            }
         }
 
         // Reflect constructors
@@ -665,6 +715,38 @@ class JavaMembers
         ctors = new MemberBox[constructors.length];
         for (int i = 0; i != constructors.length; ++i) {
             ctors[i] = new MemberBox(constructors[i]);
+        }
+    }
+
+    private void removeMethod(Map<String, Object> ht, MemberBox member)
+    {
+        removeMethods(ht, Arrays.asList(new MemberBox[] { member }));
+    }
+
+    private void removeMethods(Map<String, Object> ht, List<MemberBox> members)
+    {
+        if (members.size() > 0) {
+            String name = members.get(0).getName();
+            NativeJavaMethod method = (NativeJavaMethod) ht.get(name);
+            int length = method.methods.length - members.size();
+            if (length == 0) {
+                // Remove this one altogether
+                ht.remove(name);
+            } else {
+                // Remove this one member box from the methods list
+                MemberBox[] methods = method.methods;
+                // Create a lookup for the ones to remove
+                HashMap<MemberBox, MemberBox> lookup = new HashMap<MemberBox, MemberBox>();
+                for (MemberBox member : members)
+                    lookup.put(member, member);
+                MemberBox[] newMethods = new MemberBox[length];
+                for (int i = 0, j = 0; i < methods.length; i++) {
+                    MemberBox member = methods[i];
+                    if (!lookup.containsKey(member))
+                        newMethods[j++] = member;
+                }
+                method.methods = newMethods;
+            }
         }
     }
 
