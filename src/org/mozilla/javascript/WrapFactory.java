@@ -151,6 +151,23 @@ public class WrapFactory
     }
 
     /**
+     * Same as NativeJavaObject CONVERSION_*, but to be used
+     * by WrapFactory#getConversionWeight
+     */
+    public static final byte CONVERSION_TRIVIAL      = 1;
+    public static final byte CONVERSION_NONTRIVIAL   = 0;
+    public static final byte CONVERSION_NONE         = 99;
+
+	public int getConversionWeight(Object from, Object unwrapped, Class<?> to,
+	        int defaultWeight) {
+        return defaultWeight;
+	}
+
+    public Object coerceType(Class<?> type, Object value, Object unwrapped) {
+    	return null;
+    }
+    
+    /**
      * Return <code>false</code> if result of Java method, which is instance of
      * <code>String</code>, <code>Number</code>, <code>Boolean</code> and
      * <code>Character</code>, should be used directly as JavaScript primitive

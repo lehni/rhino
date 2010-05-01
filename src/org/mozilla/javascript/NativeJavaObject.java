@@ -44,6 +44,7 @@ package org.mozilla.javascript;
 
 import java.io.*;
 import java.lang.reflect.*;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Date;
 
@@ -364,13 +365,21 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
             }
             else if (to.isPrimitive() && to != Boolean.TYPE) {
                 return (fromCode == JSTYPE_JAVA_ARRAY)
-                       ? CONVERSION_NONE : 2 + getSizeRank(to);
+                       ? CONVERSION_NONE : 3 + getSizeRank(to);
+            } else {
+                return Context.getContext().getWrapFactory().getConversionWeight(
+                    fromObj, javaObj, to, CONVERSION_NONE);
             }
-            break;
 
         case JSTYPE_OBJECT:
             // Other objects takes #1-#3 spots
-            if (to != ScriptRuntime.ObjectClass && to.isInstance(fromObj)) {
+            // Lehni:
+            // We also need to filter out MapClass since that is now
+            // implemented by any ScriptableObject, even NativeArray.
+            // If we don't NativeArray won't be match against arrays
+            // if a Map version of the method is present.
+            if (fromObj.getClass().equals(to) || to != ScriptRuntime.ObjectClass
+                && to != ScriptRuntime.MapClass && to.isInstance(fromObj)) {
                 // No conversion required, but don't apply for java.lang.Object
                 return 1;
             }
@@ -379,14 +388,28 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                     // This is a native array conversion to a java array
                     // Array conversions are all equal, and preferable to object
                     // and string conversion, per LC3.
-                    return 1;
+
+                    // Lehni:
+                    // Look at the first element in the array to determine
+                    // conversion weight further. While this approach is not
+                    // perfect, it is certainly better than simply returning 1.
+                    // The only case where this does not work is with arrays
+                    // containing null at that position, and arrays containing
+                    // different types.
+                    return getConversionWeight(
+                            ((NativeArray) fromObj).get(0, (Scriptable) fromObj),
+                            to.getComponentType());
                 }
             }
             else if (to == ScriptRuntime.ObjectClass) {
                 return 2;
             }
             else if (to == ScriptRuntime.StringClass) {
-                return 3;
+                // Lehni:
+                // Prefer conversion from NativeString to a java String
+                // over the above conversion to a object.
+                // (typeof obj == 'object', not 'string'!)
+                return fromObj instanceof NativeString ? 1 : 3;
             }
             else if (to == ScriptRuntime.DateClass) {
                 if (fromObj instanceof NativeDate) {
@@ -401,7 +424,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                         return 1;
                     }
                 }
-                return 11;
+                return Context.getContext().getWrapFactory().getConversionWeight(
+                    fromObj, fromObj, to, 11);
             }
             else if (to.isPrimitive() && to != Boolean.TYPE) {
                 return 3 + getSizeRank(to);
@@ -409,7 +433,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
             break;
         }
 
-        return CONVERSION_NONE;
+        return Context.getContext().getWrapFactory().getConversionWeight(
+            fromObj, fromObj, to, CONVERSION_NONE);
     }
 
     static int getSizeRank(Class<?> aType) {
@@ -472,7 +497,7 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 return JSTYPE_OBJECT;
             }
         }
-        else if (value instanceof Class) {
+        else if (value instanceof Class<?>) {
             return JSTYPE_JAVA_CLASS;
         }
         else {
@@ -497,6 +522,30 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
         return coerceTypeImpl(type, value);
     }
 
+    static Object coerce(Class<?> type, Object value, Object unwrapped) {
+        Object obj = Context.getContext().getWrapFactory().coerceType(type,
+            value, unwrapped);
+        // Allow Undefined.instance being coerced to null, but nothing else
+        if (obj == null && value != Undefined.instance) {
+            reportConversionError(unwrapped, type);
+        }
+        return obj;
+    }
+
+    private static final HashMap<Class<?>, Class<?>> primitiveToWrapper
+            = new HashMap<Class<?>, Class<?>>();
+    static {
+        primitiveToWrapper.put(Boolean.TYPE, Boolean.class);
+        primitiveToWrapper.put(Character.TYPE, Character.class);
+        primitiveToWrapper.put(Byte.TYPE, Byte.class);
+        primitiveToWrapper.put(Short.TYPE, Short.class);
+        primitiveToWrapper.put(Integer.TYPE, Integer.class);
+        primitiveToWrapper.put(Long.TYPE, Long.class);
+        primitiveToWrapper.put(Float.TYPE, Float.class);
+        primitiveToWrapper.put(Double.TYPE, Double.class);
+        primitiveToWrapper.put(Void.TYPE, Void.class);
+    }
+
     /**
      * Type-munging for field setting and method invocation.
      * Conforms to LC3 specification
@@ -506,6 +555,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
         if (value != null && value.getClass() == type) {
             return value;
         }
+
+        Object original = value;
 
         switch (getJSTypeCode(value)) {
 
@@ -522,9 +573,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 return "undefined";
             }
             else {
-                reportConversionError("undefined", type);
+            	return coerce(type, value, value);
             }
-            break;
 
         case JSTYPE_BOOLEAN:
             // Under LC3, only JS Booleans can be coerced into a Boolean value
@@ -537,9 +587,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 return value.toString();
             }
             else {
-                reportConversionError(value, type);
+                return coerce(type, value, value);
             }
-            break;
 
         case JSTYPE_NUMBER:
             if (type == ScriptRuntime.StringClass) {
@@ -553,9 +602,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 return coerceToNumber(type, value);
             }
             else {
-                reportConversionError(value, type);
+                return coerce(type, value, value);
             }
-            break;
 
         case JSTYPE_STRING:
             if (type == ScriptRuntime.StringClass || type.isInstance(value)) {
@@ -581,9 +629,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 return coerceToNumber(type, value);
             }
             else {
-                reportConversionError(value, type);
+                return coerce(type, value, value);
             }
-            break;
 
         case JSTYPE_JAVA_CLASS:
             if (value instanceof Wrapper) {
@@ -598,18 +645,17 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 return value.toString();
             }
             else {
-                reportConversionError(value, type);
+                return coerce(type, original, value);
             }
-            break;
 
         case JSTYPE_JAVA_OBJECT:
-        case JSTYPE_JAVA_ARRAY:              
+        case JSTYPE_JAVA_ARRAY:
             if (value instanceof Wrapper) {
               value = ((Wrapper)value).unwrap();
             }
             if (type.isPrimitive()) {
                 if (type == Boolean.TYPE) {
-                    reportConversionError(value, type);
+                    return coerce(type, original, value);
                 }
                 return coerceToNumber(type, value);
             }
@@ -622,11 +668,13 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                         return value;
                     }
                     else {
-                        reportConversionError(value, type);
+                        // We must be here because canConvert returned true
+                        // Give it a try. pass the wrapped value, to let the
+                        // wrap factory decide what to do with it.
+                        return coerce(type, original, value);
                     }
                 }
             }
-            break;
 
         case JSTYPE_OBJECT:
             if (type == ScriptRuntime.StringClass) {
@@ -634,7 +682,7 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
             }
             else if (type.isPrimitive()) {
                 if (type == Boolean.TYPE) {
-                    reportConversionError(value, type);
+                    return coerce(type, value, value);
                 }
                 return coerceToNumber(type, value);
             }
@@ -652,26 +700,33 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 // Make a new java array, and coerce the JS array components
                 // to the target (component) type.
                 NativeArray array = (NativeArray) value;
-                long length = array.getLength();
+                int length = (int) array.getLength();
                 Class<?> arrayType = type.getComponentType();
-                Object Result = Array.newInstance(arrayType, (int)length);
+                Object result = Array.newInstance(arrayType, length);
+                // Convert primitive types to their wrappers, since coerceType
+                // is returning primitive values as boxed objects as well.
+                if (arrayType.isPrimitive())
+                    arrayType = primitiveToWrapper.get(arrayType);
                 for (int i = 0 ; i < length ; ++i) {
                     try  {
-                        Array.set(Result, i, coerceType(arrayType,
-                                                        array.get(i, array)));
+                        Object entry = coerceTypeImpl(arrayType, array.get(i, array));
+                        if (entry == Undefined.instance)
+                            entry = null;
+                        if (entry == null || arrayType.isInstance(entry))
+                            Array.set(result, i, entry);
                     }
                     catch (EvaluatorException ee) {
                         reportConversionError(value, type);
                     }
                 }
 
-                return Result;
+                return result;
             }
             else if (value instanceof Wrapper) {
                 value = ((Wrapper)value).unwrap();
                 if (type.isInstance(value))
                     return value;
-                reportConversionError(value, type);
+                return coerce(type, original, value);
             }
             else if (type.isInterface() && value instanceof Callable) {
                 // Try to use function as implementation of Java interface.
@@ -693,15 +748,15 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                     Context cx = Context.getContext();
                     Object glue
                         = InterfaceAdapter.create(cx, type, (Callable)value);
-                    // Store for later retrival
+                    // Store for later retrieval
                     glue = so.associateValue(key, glue);
                     return glue;
                 }
-                reportConversionError(value, type);
-            } else {
-                reportConversionError(value, type);
+                return coerce(type, value, value);
             }
-            break;
+            else {
+                return coerce(type, value, value);
+            }
         }
 
         return value;

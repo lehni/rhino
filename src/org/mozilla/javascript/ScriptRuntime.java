@@ -149,7 +149,8 @@ public class ScriptRuntime {
         ObjectClass       = Kit.classOrNull("java.lang.Object"),
         ShortClass        = Kit.classOrNull("java.lang.Short"),
         StringClass       = Kit.classOrNull("java.lang.String"),
-        DateClass         = Kit.classOrNull("java.util.Date");
+        DateClass         = Kit.classOrNull("java.util.Date"),
+        MapClass          = Kit.classOrNull("java.util.Map");
 
     public final static Class<?>
         ContextClass
