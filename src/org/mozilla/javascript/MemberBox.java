@@ -52,7 +52,7 @@ import java.io.*;
  * @author Igor Bukanov
  */
 
-final class MemberBox implements Serializable
+public final class MemberBox implements Serializable
 {
     static final long serialVersionUID = 6358550398665688245L;
 
@@ -62,12 +62,13 @@ final class MemberBox implements Serializable
     transient boolean vararg;
 
 
-    MemberBox(Method method)
+
+    public MemberBox(Method method)
     {
         init(method);
     }
 
-    MemberBox(Constructor<?> constructor)
+    public MemberBox(Constructor<?> constructor)
     {
         init(constructor);
     }
@@ -86,47 +87,47 @@ final class MemberBox implements Serializable
         this.vararg = VMBridge.instance.isVarArgs(constructor);
     }
 
-    Method method()
+    public Method method()
     {
         return (Method)memberObject;
     }
 
-    Constructor<?> ctor()
+    public Constructor<?> ctor()
     {
         return (Constructor<?>)memberObject;
     }
 
-    Member member()
+    public Member member()
     {
         return memberObject;
     }
 
-    boolean isMethod()
+    public boolean isMethod()
     {
         return memberObject instanceof Method;
     }
 
-    boolean isCtor()
+    public boolean isCtor()
     {
         return memberObject instanceof Constructor;
     }
 
-    boolean isStatic()
+    public boolean isStatic()
     {
         return Modifier.isStatic(memberObject.getModifiers());
     }
 
-    String getName()
+    public String getName()
     {
         return memberObject.getName();
     }
 
-    Class<?> getDeclaringClass()
+    public Class<?> getDeclaringClass()
     {
         return memberObject.getDeclaringClass();
     }
 
-    String toJavaDeclaration()
+    public String toJavaDeclaration()
     {
         StringBuffer sb = new StringBuffer();
         if (isMethod()) {
@@ -153,7 +154,7 @@ final class MemberBox implements Serializable
         return memberObject.toString();
     }
 
-    Object invoke(Object target, Object[] args)
+    public Object invoke(Object target, Object[] args)
     {
         Method method = method();
         try {
@@ -186,7 +187,7 @@ final class MemberBox implements Serializable
         }
     }
 
-    Object newInstance(Object[] args)
+    public Object newInstance(Object[] args)
     {
         Constructor<?> ctor = ctor();
         try {
