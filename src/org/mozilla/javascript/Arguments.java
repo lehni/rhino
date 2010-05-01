@@ -339,55 +339,48 @@ final class Arguments extends IdScriptableObject
     }
 
     @Override
-    protected ScriptableObject getOwnPropertyDescriptor(Context cx, Object id) {
-      double d = ScriptRuntime.toNumber(id);
-      int index = (int) d;
-      if (d != index) {
-        return super.getOwnPropertyDescriptor(cx, id);
-      }
-      Object value = arg(index);
-      if (value == NOT_FOUND) {
-        return super.getOwnPropertyDescriptor(cx, id);
-      } 
-      if (sharedWithActivation(index)) {
-        value = getFromActivation(index);
-      }
-      if (super.has(index, this)) { // the descriptor has been redefined
-        ScriptableObject desc = super.getOwnPropertyDescriptor(cx, id);
-        desc.put("value", desc, value);
-        return desc;
-      } else {
-        Scriptable scope = getParentScope();
-        if (scope == null) scope = this;
-        return buildDataDescriptor(scope, value, EMPTY);
-      }
+    protected PropertyDescriptor getOwnPropertyDescriptor(Context cx, Object id) {
+        double d = ScriptRuntime.toNumber(id);
+        int index = (int) d;
+        if (d != index) {
+            return super.getOwnPropertyDescriptor(cx, id);
+        }
+        Object value = arg(index);
+        if (value == NOT_FOUND) {
+            return super.getOwnPropertyDescriptor(cx, id);
+        }
+        if (sharedWithActivation(index)) {
+            value = getFromActivation(index);
+        }
+        if (super.has(index, this)) { // the descriptor has been redefined
+            PropertyDescriptor desc = super.getOwnPropertyDescriptor(cx, id);
+            desc.setValue(value);
+            return desc;
+        } else {
+            Scriptable scope = getParentScope();
+            if (scope == null)
+                scope = this;
+            return new PropertyDescriptor(value, true, true, true, true);
+        }
     }
 
     @Override
-    public void defineOwnProperty(Context cx, Object id, ScriptableObject desc) {
-      super.defineOwnProperty(cx, id, desc);
+    public void defineOwnProperty(Context cx, Object id, PropertyDescriptor desc) {
+        super.defineOwnProperty(cx, id, desc);
 
-      double d = ScriptRuntime.toNumber(id);
-      int index = (int) d;
-      if (d != index) return;
-
-      Object value = arg(index);
-      if (value == NOT_FOUND) return;
-
-      if (isAccessorDescriptor(desc)) {
-        removeArg(index);
-        return;
-      }
-
-      Object newValue = getProperty(desc, "value");
-      if (newValue == NOT_FOUND) return;
-
-      replaceArg(index, newValue);
-
-      if (isFalse(getProperty(desc, "writable"))) {
-        removeArg(index);
-      }
-    }
+        double d = ScriptRuntime.toNumber(id);
+        int index = (int) d;
+        if (d == index && arg(index) != NOT_FOUND) {
+            if (desc.isAccessorDescriptor()) {
+                removeArg(index);
+            } else if (desc.hasValue()) {
+                replaceArg(index, desc.getValue());
+                if (!desc.isWritable()) {
+                    removeArg(index);
+                }
+            }
+        }
+     }
 
 // Fields to hold caller, callee and length properties,
 // where NOT_FOUND value tags deleted properties.

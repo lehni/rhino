@@ -323,8 +323,8 @@ public class NativeObject extends IdScriptableObject
                 ScriptableObject obj = ensureScriptableObject(arg);
                 Object nameArg = args.length < 2 ? Undefined.instance : args[1];
                 String name = ScriptRuntime.toString(nameArg);
-                Scriptable desc = obj.getOwnPropertyDescriptor(cx, name);
-                return desc == null ? Undefined.instance : desc;
+                PropertyDescriptor desc = obj.getOwnPropertyDescriptor(cx, name);
+                return desc == null ? Undefined.instance : desc.toObject(scope);
               }
           case ConstructorId_defineProperty:
               {
@@ -332,8 +332,7 @@ public class NativeObject extends IdScriptableObject
                 ScriptableObject obj = ensureScriptableObject(arg);
                 Object name = args.length < 2 ? Undefined.instance : args[1];
                 Object descArg = args.length < 3 ? Undefined.instance : args[2];
-                ScriptableObject desc = ensureScriptableObject(descArg);
-                obj.defineOwnProperty(cx, name, desc);
+                obj.defineOwnProperty(cx, name, new PropertyDescriptor(descArg));
                 return obj;
               }
           case ConstructorId_isExtensible:
@@ -383,8 +382,7 @@ public class NativeObject extends IdScriptableObject
                 if (obj.isExtensible()) return false;
 
                 for (Object name: obj.getAllIds()) {
-                  Object configurable = obj.getOwnPropertyDescriptor(cx, name).get("configurable");
-                  if (Boolean.TRUE.equals(configurable)) 
+                  if (obj.getOwnPropertyDescriptor(cx, name).isConfigurable()) 
                     return false;
                 }
 
@@ -398,10 +396,8 @@ public class NativeObject extends IdScriptableObject
                 if (obj.isExtensible()) return false;
 
                 for (Object name: obj.getAllIds()) {
-                  ScriptableObject desc = obj.getOwnPropertyDescriptor(cx, name);
-                  if (Boolean.TRUE.equals(desc.get("configurable"))) 
-                    return false;
-                  if (isDataDescriptor(desc) && Boolean.TRUE.equals(desc.get("writable")))
+                  PropertyDescriptor desc = obj.getOwnPropertyDescriptor(cx, name);
+                  if (desc.isConfigurable() || desc.isDataDescriptor() && desc.isWritable()) 
                     return false;
                 }
 
@@ -413,9 +409,9 @@ public class NativeObject extends IdScriptableObject
                 ScriptableObject obj = ensureScriptableObject(arg);
 
                 for (Object name: obj.getAllIds()) {
-                  ScriptableObject desc = obj.getOwnPropertyDescriptor(cx, name);
-                  if (Boolean.TRUE.equals(desc.get("configurable"))) {
-                    desc.put("configurable", desc, false);
+                  PropertyDescriptor desc = obj.getOwnPropertyDescriptor(cx, name);
+                  if (desc.isConfigurable()) {
+                    desc.setConfigurable(false);
                     obj.defineOwnProperty(cx, name, desc); 
                   }
                 }
@@ -429,11 +425,11 @@ public class NativeObject extends IdScriptableObject
                 ScriptableObject obj = ensureScriptableObject(arg);
 
                 for (Object name: obj.getAllIds()) {
-                  ScriptableObject desc = obj.getOwnPropertyDescriptor(cx, name);
-                  if (isDataDescriptor(desc) && Boolean.TRUE.equals(desc.get("writable")))
-                    desc.put("writable", desc, false);
-                  if (Boolean.TRUE.equals(desc.get("configurable")))
-                    desc.put("configurable", desc, false);
+                  PropertyDescriptor desc = obj.getOwnPropertyDescriptor(cx, name);
+                  if (desc.isDataDescriptor() && desc.isWritable())
+                    desc.setWritable(false);
+                  if (desc.isConfigurable())
+                    desc.setConfigurable(false);
                   obj.defineOwnProperty(cx, name, desc);
                 }
                 obj.preventExtensions();
