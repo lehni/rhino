@@ -70,7 +70,7 @@ import org.mozilla.javascript.annotations.*;
 
 public abstract class ScriptableObject implements Scriptable, Serializable,
                                                   DebuggableObject,
-                                                  ConstProperties, Map
+                                                  ConstProperties, Map<Object, Object>
 {
 
     /**
@@ -2994,6 +2994,19 @@ public abstract class ScriptableObject implements Scriptable, Serializable,
             return null;
         } else if (value instanceof Wrapper) {
             return ((Wrapper) value).unwrap();
+        } else if (value instanceof NativeArray) {
+            // Convert NativeArray to Java Object arrays, as needed by
+            // Scriptographer's integration mechnisms...
+            NativeArray array = (NativeArray) value;
+            int length = (int) array.getLength();
+            Object[] list = new Object[length];
+            for (int i = 0; i < length; i++) {
+                Object obj = array.get(i, array);
+                if (obj instanceof Wrapper)
+                    obj = ((Wrapper) obj).unwrap();
+                list[i] = obj;
+            }
+            return list;
         } else {
             return value;
         }
@@ -3022,15 +3035,31 @@ public abstract class ScriptableObject implements Scriptable, Serializable,
     }
 
     public Object put(Object key, Object value) {
-        throw new UnsupportedOperationException();
+        // Add more features from MapAdapter, so Map interface here is  not
+        // read-only. Wrap the value if it is not already
+        if (value != null && !(value instanceof Scriptable)) {
+            Context cx = Context.getCurrentContext();
+            value = cx.getWrapFactory().wrap(cx, this, value, value.getClass());
+        }
+        Object prev = get(key);
+        if (key instanceof Integer)
+            put(((Integer) key).intValue(), this, value);
+        else if (key instanceof String)
+            put((String) key, this, value);
+        else
+            prev = null;
+        return prev;
     }
 
-    public void putAll(Map m) {
-        throw new UnsupportedOperationException();
+    public void putAll(Map<?, ?> map) { 
+        for (Map.Entry<?, ?> entry : map.entrySet())
+            put(entry.getKey(), entry.getValue());
     }
 
     public void clear() {
-        throw new UnsupportedOperationException();
+        Object[] ids = getIds();
+        for (int i = 0; i < ids.length; i++)
+            remove(ids[i]);
     }
 
 
@@ -3048,36 +3077,37 @@ public abstract class ScriptableObject implements Scriptable, Serializable,
 
                 public Map.Entry<Object, Object> next() {
                     final Object ekey = key = ids[index++];
-                    final Object value = get(key);
                     return new Map.Entry<Object, Object>() {
                         public Object getKey() {
                             return ekey;
                         }
 
                         public Object getValue() {
-                            return value;
+                            return get(ekey);
                         }
 
                         public Object setValue(Object value) {
-                            throw new UnsupportedOperationException();
+                            return put(ekey, value);
                         }
 
                         public boolean equals(Object other) {
-                            if (!(other instanceof Map.Entry)) {
-                                return false;
+                            if (other instanceof Map.Entry<?, ?>) {
+                                Map.Entry<?, ?> e = (Map.Entry<?, ?>) other;
+                                Object value = getValue();
+                                return (ekey == null ? e.getKey() == null : ekey.equals(e.getKey()))
+                                    && (value == null ? e.getValue() == null : value.equals(e.getValue()));
                             }
-                            Map.Entry e = (Map.Entry) other;
-                            return (ekey == null ? e.getKey() == null : ekey.equals(e.getKey()))
-                                && (value == null ? e.getValue() == null : value.equals(e.getValue()));
+                            return false;
                         }
 
                         public int hashCode() {
+                            Object value = getValue();
                             return (ekey == null ? 0 : ekey.hashCode()) ^
                                    (value == null ? 0 : value.hashCode());
                         }
 
                         public String toString() {
-                            return ekey + "=" + value;
+                            return ekey + "=" + getValue();
                         }
                     };
                 }
