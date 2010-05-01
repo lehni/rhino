@@ -150,6 +150,16 @@ public class WrapFactory
         return wrap;
     }
 
+    public boolean shouldAddBean(Class<?> cls, boolean isStatic,
+            MemberBox getter, MemberBox setter) {
+        return true;
+    }
+
+    public boolean shouldRemoveGetterSetter(Class<?> cls, boolean isStatic,
+            MemberBox getter, MemberBox setter) {
+        return false;
+    }
+    
     /**
      * Return <code>false</code> if result of Java method, which is instance of
      * <code>String</code>, <code>Number</code>, <code>Boolean</code> and
