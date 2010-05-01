@@ -487,13 +487,58 @@ class JavaMembers
                     methodBoxes[0] = new MemberBox((Method)value);
                 } else {
                     ObjArray overloadedMethods = (ObjArray)value;
-                    int N = overloadedMethods.size();
-                    if (N < 2) Kit.codeBug();
-                    methodBoxes = new MemberBox[N];
-                    for (int i = 0; i != N; ++i) {
-                        Method method = (Method)overloadedMethods.get(i);
-                        methodBoxes[i] = new MemberBox(method);
+					// Filter out synthetic bridge methods, generated for
+					// generics (see ClassFileFormat-Java5.pdf).
+					// These methods may pretend to take Objects but then cast
+					// to the type defined by erasures, leading to Rhino
+					// preferring the wrong versions and then throwing a
+					// ClassCastException.
+					// Do not filter in discoverAccessibleMethods since it is
+					// easier to discover synthetic-only methods that should
+					// still be added, since methods are grouped by name here.
+					// This happens for example in various classes of the Java
+					// 1.6 Doclet API, but not in 1.5. No idea where these
+					// modifiers come from there.
+                    int count = overloadedMethods.size();
+                    if (count < 2) Kit.codeBug();
+                    ObjArray validMethods = new ObjArray();
+                    for (int i = 0; i < count; i++) {
+                        Method method = (Method) overloadedMethods.get(i);
+                        if (method.isBridge() && method.isSynthetic()) {
+                            // See if there is another method with a similar
+                        	// signature. If there is, do not add this one,
+                        	// otherwise keep it
+                            boolean overrides = false;
+                            Class<?> returnType = method.getReturnType();
+                            Class<?>[] types = method.getParameterTypes();
+                            for (int j = 0; j < count && !overrides; j++) {
+                                if (j != i) {
+                                    Method otherMethod = (Method) overloadedMethods.get(j);
+                                    overrides = returnType.isAssignableFrom(otherMethod.getReturnType());
+                                    if (overrides) {
+                                        Class<?>[] otherTypes = otherMethod.getParameterTypes();
+                                        if (types.length == otherTypes.length)
+                                            for (int k = 0; k < types.length && overrides; k++)
+                                                overrides = types[k].isAssignableFrom(otherTypes[k]);
+                                    }
+                                }
+                            }
+                            // Add it if it does not override another real method
+                            if (!overrides)
+                                validMethods.add(method);
+                        } else {
+                            validMethods.add(method);
+                        }
                     }
+                    // If they are all synthetic bridge methods, add them still:
+                    if (validMethods.size() == 0) {
+                        validMethods = overloadedMethods;
+                    } else {
+                        count = validMethods.size();
+                    }
+                    methodBoxes = new MemberBox[count];
+                    for (int i = 0; i != count; ++i)
+                        methodBoxes[i] = new MemberBox((Method) validMethods.get(i));
                 }
                 NativeJavaMethod fun = new NativeJavaMethod(methodBoxes);
                 if (scope != null) {
