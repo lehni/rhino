@@ -2872,15 +2872,13 @@ public abstract class ScriptableObject implements Scriptable, Serializable,
     }
 
     protected Slot getSlot(Context cx, Object id, int accessType) {
-        final Slot slot;
         String name = ScriptRuntime.toStringIdOrIndex(cx, id);
         if (name == null) {
             int index = ScriptRuntime.lastIndexResult(cx);
-            slot = getSlot(null, index, accessType);
+            return getSlot(null, index, accessType);
         } else {
-            slot = getSlot(name, 0, accessType);
+            return getSlot(name, 0, accessType);
         }
-        return slot;
     }
 
     // Methods and classes to implement java.util.Map interface
