@@ -52,9 +52,9 @@ import java.util.*;
  * @see NativeJavaObject
  * @see NativeJavaClass
  */
-class JavaMembers
+public class JavaMembers
 {
-    JavaMembers(Scriptable scope, Class<?> cl)
+    public JavaMembers(Scriptable scope, Class<?> cl)
     {
         this(scope, cl, false);
     }
@@ -79,7 +79,7 @@ class JavaMembers
         }
     }
 
-    boolean has(String name, boolean isStatic)
+    public boolean has(String name, boolean isStatic)
     {
         Map<String,Object> ht = isStatic ? staticMembers : members;
         Object obj = ht.get(name);
@@ -89,7 +89,7 @@ class JavaMembers
         return findExplicitFunction(name, isStatic) != null;
     }
 
-    Object get(Scriptable scope, String name, Object javaObject,
+    public Object get(Scriptable scope, String name, Object javaObject,
                boolean isStatic)
     {
         Map<String,Object> ht = isStatic ? staticMembers : members;
@@ -130,7 +130,7 @@ class JavaMembers
         return cx.getWrapFactory().wrap(cx, scope, rval, type);
     }
 
-    void put(Scriptable scope, String name, Object javaObject,
+    public void put(Scriptable scope, String name, Object javaObject,
              Object value, boolean isStatic)
     {
         Map<String,Object> ht = isStatic ? staticMembers : members;
@@ -195,7 +195,7 @@ class JavaMembers
         }
     }
 
-    Object[] getIds(boolean isStatic)
+    public Object[] getIds(boolean isStatic)
     {
         Map<String,Object> map = isStatic ? staticMembers : members;
         return map.keySet().toArray(new Object[map.size()]);

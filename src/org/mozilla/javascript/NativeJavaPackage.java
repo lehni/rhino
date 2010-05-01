@@ -60,7 +60,7 @@ public class NativeJavaPackage extends ScriptableObject
 {
     static final long serialVersionUID = 7445054382212031523L;
 
-    NativeJavaPackage(boolean internalUsage, String packageName,
+    public NativeJavaPackage(boolean internalUsage, String packageName,
                       ClassLoader classLoader)
     {
         this.packageName = packageName;
@@ -137,7 +137,7 @@ public class NativeJavaPackage extends ScriptableObject
         }
     }
 
-    synchronized Object getPkgProperty(String name, Scriptable start,
+    public synchronized Object getPkgProperty(String name, Scriptable start,
                                        boolean createPkg)
     {
         Object cached = super.get(name, start);

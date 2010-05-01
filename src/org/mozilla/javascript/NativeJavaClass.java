@@ -312,7 +312,7 @@ public class NativeJavaClass extends NativeJavaObject implements Function
         return false;
     }
 
-    private static Class<?> findNestedClass(Class<?> parentClass, String name) {
+    protected static Class<?> findNestedClass(Class<?> parentClass, String name) {
         String nestedClassName = parentClass.getName() + '$' + name;
         ClassLoader loader = parentClass.getClassLoader();
         if (loader == null) {
@@ -326,5 +326,5 @@ public class NativeJavaClass extends NativeJavaObject implements Function
         }
     }
 
-    private Map<String,FieldAndMethods> staticFieldAndMethods;
+    protected Map<String,FieldAndMethods> staticFieldAndMethods;
 }
