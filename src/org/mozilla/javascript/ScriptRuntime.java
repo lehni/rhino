@@ -3360,6 +3360,9 @@ public class ScriptRuntime {
 
             Scriptable errorObject = cx.newObject(scope, errorName, args);
             ScriptableObject.putProperty(errorObject, "name", errorName);
+            // Add java exception to the error object so we can do stack traces
+            // from the JavaScript side
+            ScriptableObject.putProperty(errorObject, "exception", re);
             // set exception in Error objects to enable non-ECMA "stack" property
             if (errorObject instanceof NativeError) {
                 ((NativeError) errorObject).setStackProvider(re);
