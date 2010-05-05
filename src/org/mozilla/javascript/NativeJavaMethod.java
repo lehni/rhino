@@ -433,11 +433,14 @@ public class NativeJavaMethod extends BaseFunction
         if (firstBestFit < 0) {
             // Nothing was found
             return -1;
-        } else if (extraBestFitsCount == 0) {
+        } else /*if (extraBestFitsCount == 0)*/ {
             // single best fit
             return firstBestFit;
         }
-
+        // Let's not care about ambiguity and allow the WrapFactory
+        // to figure out what's best to do with the parameters.
+        // TODO: Make this an Rhino wide switch?
+        /*
         // report remaining ambiguity
         StringBuffer buf = new StringBuffer();
         for (int j = -1; j != extraBestFitsCount; ++j) {
@@ -464,6 +467,7 @@ public class NativeJavaMethod extends BaseFunction
                 "msg.method.ambiguous", memberClass,
                 memberName, scriptSignature(args), buf.toString());
         }
+        */
     }
 
     /** Types are equal */
