@@ -2921,19 +2921,6 @@ public abstract class ScriptableObject implements Scriptable, Serializable,
             return null;
         } else if (value instanceof Wrapper) {
             return ((Wrapper) value).unwrap();
-        } else if (value instanceof NativeArray) {
-            // Convert NativeArray to Java Object arrays, as needed by
-            // Scriptographer's integration mechnisms...
-            NativeArray array = (NativeArray) value;
-            int length = (int) array.getLength();
-            Object[] list = new Object[length];
-            for (int i = 0; i < length; i++) {
-                Object obj = array.get(i, array);
-                if (obj instanceof Wrapper)
-                    obj = ((Wrapper) obj).unwrap();
-                list[i] = obj;
-            }
-            return list;
         } else {
             return value;
         }
