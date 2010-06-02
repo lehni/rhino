@@ -396,9 +396,13 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                     // The only case where this does not work is with arrays
                     // containing null at that position, and arrays containing
                     // different types.
-                    return getConversionWeight(
-                            ((NativeArray) fromObj).get(0, (Scriptable) fromObj),
-                            to.getComponentType());
+                    // Also, arrays of length null are a trivial special case
+                    // for conversion, as no elements need to be coverted.
+                    NativeArray array = (NativeArray) fromObj;
+                    return array.getLength() == 0 ? CONVERSION_TRIVIAL
+                            : getConversionWeight(array.get(0,
+                                    (Scriptable) fromObj),
+                                    to.getComponentType());
                 }
             }
             else if (to == ScriptRuntime.ObjectClass) {
@@ -719,7 +723,6 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                         reportConversionError(value, type);
                     }
                 }
-
                 return result;
             }
             else if (value instanceof Wrapper) {
